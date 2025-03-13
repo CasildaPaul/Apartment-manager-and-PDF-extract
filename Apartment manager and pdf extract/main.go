@@ -746,6 +746,27 @@ func ShowAccountsManager(myApp fyne.App, previousWindow fyne.Window) {
 	transactionTypes := []string{"Debit (Money Paid)", "Credit (Money Received)"}
 	transactionSelect := widget.NewSelect(transactionTypes, nil)
 
+	// Define transactions variable and create list widget
+	var transactions []Payment
+	transactionList := widget.NewList(
+		func() int { return len(transactions) },
+		func() fyne.CanvasObject { return widget.NewLabel("") },
+		func(id widget.ListItemID, obj fyne.CanvasObject) {
+			t := transactions[id]
+			obj.(*widget.Label).SetText(fmt.Sprintf("%s - %s: %s ₹%.2f",
+				t.Month, t.Type, t.TransactionType, t.Price))
+		},
+	)
+
+	// Function to refresh transaction list
+	refreshTransactionList := func() {
+		transactions = getRecentTransactions(10)
+		transactionList.Refresh()
+	}
+
+	// Initial loading of transactions
+	refreshTransactionList()
+
 	// Process button
 	processButton := widget.NewButton("Confirm Transaction", func() {
 		if monthSelect.Selected == "" || typeSelect.Selected == "" ||
@@ -771,6 +792,9 @@ func ShowAccountsManager(myApp fyne.App, previousWindow fyne.Window) {
 			return
 		}
 
+		// Refresh transaction list after saving
+		refreshTransactionList()
+
 		dialog.ShowInformation("Success", "Transaction recorded successfully", accountsWindow)
 		monthSelect.ClearSelected()
 		typeSelect.ClearSelected()
@@ -783,18 +807,6 @@ func ShowAccountsManager(myApp fyne.App, previousWindow fyne.Window) {
 		accountsWindow.Hide()
 		previousWindow.Show()
 	})
-
-	// Transaction history
-	transactions := getRecentTransactions(10)
-	transactionList := widget.NewList(
-		func() int { return len(transactions) },
-		func() fyne.CanvasObject { return widget.NewLabel("") },
-		func(id widget.ListItemID, obj fyne.CanvasObject) {
-			t := transactions[id]
-			obj.(*widget.Label).SetText(fmt.Sprintf("%s - %s: %s ₹%.2f",
-				t.Month, t.Type, t.TransactionType, t.Price))
-		},
-	)
 
 	// Layout
 	form := container.NewVBox(
@@ -825,6 +837,14 @@ func ShowAccountsManager(myApp fyne.App, previousWindow fyne.Window) {
 		container.NewTabItem("Form", form),
 		container.NewTabItem("History", history),
 	)
+
+	// Add tab change listener to refresh history when switching to that tab
+	tabs.OnChanged = func(tab *container.TabItem) {
+		if tab.Text == "History" {
+			refreshTransactionList()
+		}
+	}
+
 	content := tabs
 
 	accountsWindow.SetContent(content)
